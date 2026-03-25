@@ -1,0 +1,15 @@
+{
+  "name": "knapsack_small_5",
+  "description": "Instância pequena com 5 itens — ótimo conhecido: 40",
+  "capacity": 10,
+  "items": [
+    {"id": 1, "weight": 2, "profit": 6},
+    {"id": 2, "weight": 2, "profit": 10},
+    {"id": 3, "weight": 3, "profit": 12},
+    {"id": 4, "weight": 1, "profit": 3},
+    {"id": 5, "weight": 4, "profit": 15}
+  ],
+  "optimal_value": 40,
+  "optimal_items": [2, 3, 4, 5],
+  "source": "ORKit v1.0"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "cutting_stock_small_3",
+  "description": "Instância pequena — 3 tipos de peça, rolo-mestre = 100",
+  "master_roll": 100,
+  "items": [
+    {"id": 1, "width": 25, "demand": 4},
+    {"id": 2, "width": 40, "demand": 3},
+    {"id": 3, "width": 15, "demand": 6}
+  ],
+  "source": "ORKit v1.0"
+}
