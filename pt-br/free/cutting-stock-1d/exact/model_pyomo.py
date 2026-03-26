@@ -1,21 +1,124 @@
-"""Corte de Estoque 1D — Geração de Colunas com Pyomo + HiGHS.
+"""Corte de Estoque 1D — Formulacao MIP Compacta com Pyomo + HiGHS.
 
-Algoritmo (Gilmore & Gomory, 1961):
-    1. Inicializar com padrões triviais (um tipo por padrão).
-    2. Resolver o Problema Mestre LP relaxado → obter preços-sombra π.
-    3. Resolver o Sub-problema (Mochila Inteira) com lucros π.
-    4. Se z* > 1 + ε, acrescentar nova coluna e voltar ao passo 2.
-    5. Caso contrário, resolver o Mestre Inteiro (MIP) com todas as colunas.
+Formulacao:
 
-Solvers suportados: "appsi_highs" (padrão), "glpk", "cbc", "scip".
+    min   sum_n  y_n
+    s.a.  sum_n  x_{in}  >= d_i          para todo i  (demanda)
+          sum_i  w_i * x_{in}  <= W*y_n  para todo n  (capacidade)
+          y_n in {0,1},  x_{in} in Z+
 
-Dependências:
-    pip install pyomo highspy numpy
+N_max = sum(d_i): cota superior trivial (uma peca por rolo no pior caso).
 
-Referências:
-    Gilmore, P. C., Gomory, R. E. (1961). Operations Research, 9(6), 849-859.
-    Gilmore, P. C., Gomory, R. E. (1963). Operations Research, 11(6), 863-888.
+Solvers suportados: "appsi_highs" (padrao), "glpk", "cbc", "scip".
+
+Dependencias:
+    pip install pyomo highspy
+
+Referencias:
+    Kantorovich, L. V. (1960). Mathematical Methods of Organising and Planning Production.
+    Wascher et al. (2007). European Journal of Operational Research, 183(3), 1109-1130.
 """
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pyomo.environ as pyo
+
+from instance import CuttingStockInstance
+
+
+def build_model(instance: CuttingStockInstance) -> pyo.ConcreteModel:
+    """Constroi o modelo MIP compacto para o Corte de Estoque 1D.
+
+    Args:
+        instance: Instancia do problema (master_roll, items com width e demand).
+
+    Returns:
+        Modelo Pyomo construido e pronto para resolver.
+    """
+    W = instance.master_roll
+    items = instance.items
+    n_max = sum(it.demand for it in items)  # cota superior trivial
+
+    model = pyo.ConcreteModel(name="CuttingStock_MIP")
+
+    # --- Conjuntos ---
+    model.I = pyo.Set(initialize=[it.id for it in items])
+    model.N = pyo.RangeSet(1, n_max)
+
+    # --- Parametros ---
+    model.w = pyo.Param(model.I, initialize={it.id: it.width for it in items})
+    model.d = pyo.Param(model.I, initialize={it.id: it.demand for it in items})
+    model.W = pyo.Param(initialize=W)
+
+    # --- Variaveis ---
+    model.y = pyo.Var(model.N, within=pyo.Binary)           # rolo n aberto?
+    model.x = pyo.Var(model.I, model.N, within=pyo.NonNegativeIntegers)
+
+    # --- Objetivo ---
+    model.obj = pyo.Objective(
+        expr=sum(model.y[n] for n in model.N),
+        sense=pyo.minimize,
+    )
+
+    # --- Restricoes de demanda ---
+    def demanda_rule(m, i):
+        return sum(m.x[i, n] for n in m.N) >= m.d[i]
+
+    model.demanda = pyo.Constraint(model.I, rule=demanda_rule)
+
+    # --- Restricoes de capacidade ---
+    def capacidade_rule(m, n):
+        return sum(m.w[i] * m.x[i, n] for i in m.I) <= m.W * m.y[n]
+
+    model.capacidade = pyo.Constraint(model.N, rule=capacidade_rule)
+
+    return model
+
+
+def solve(instance: CuttingStockInstance, solver: str = "appsi_highs") -> dict:
+    """Resolve a instancia e retorna dicionario com resultados.
+
+    Args:
+        instance: Instancia do problema.
+        solver: Nome do solver Pyomo.
+
+    Returns:
+        Dict com 'status', 'rolls_used', 'patterns'.
+    """
+    model = build_model(instance)
+    opt = pyo.SolverFactory(solver)
+    result = opt.solve(model, tee=False)
+
+    status = str(result.solver.termination_condition)
+    rolls_used = int(round(pyo.value(model.obj)))
+
+    # Padroes de corte utilizados
+    patterns = {}
+    for n in model.N:
+        if pyo.value(model.y[n]) > 0.5:
+            pattern = {}
+            for i in model.I:
+                qty = int(round(pyo.value(model.x[i, n])))
+                if qty > 0:
+                    pattern[i] = qty
+            if pattern:
+                patterns[n] = pattern
+
+    return {"status": status, "rolls_used": rolls_used, "patterns": patterns}
+
+
+if __name__ == "__main__":
+    path = sys.argv[1] if len(sys.argv) > 1 else "../instances/small_3.json"
+    inst = CuttingStockInstance.from_json(Path(path))
+    res = solve(inst)
+    print(f"Status : {res['status']}")
+    print(f"Rolos  : {res['rolls_used']}")
+    for n, pat in res["patterns"].items():
+        print(f"  Rolo {n}: {pat}")
+
 
 from __future__ import annotations
 

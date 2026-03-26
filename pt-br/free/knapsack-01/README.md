@@ -1,6 +1,6 @@
 # Mochila 0/1 (Binary Knapsack Problem)
 
-> Bundle: **Gratuito (free)** · Tipo: Programação Inteira Binária
+> Tipo: Programação Inteira Binária
 
 ---
 
@@ -38,12 +38,17 @@ $$x_i \in \{0, 1\}, \quad \forall i \in I$$
 
 ---
 
-## Variantes cobertas neste bundle
+## Métodos de resolução
 
-| Variante | Arquivo |
-|---|---|
-| Mochila 0/1 clássica (este problema) | `exact/model_pyomo.py`, `exact/model_jump.jl` |
-| Mochila 0/1 com Gurobi | `exact/model_gurobi.py` |
+| Categoria        | Ferramenta         | Arquivo                       |
+|------------------|--------------------|-------------------------------|
+| Exato            | Pyomo + HiGHS      | `exact/model_pyomo.py`        |
+| Exato            | Gurobi             | `exact/model_gurobi.py`       |
+| Exato            | OR-Tools CP-SAT    | `exact/model_ortools.py`      |
+| Exato            | JuMP + HiGHS       | `exact/model_jump.jl`         |
+| Meta-heurística  | Simulated Annealing| `metaheuristics/sa.py`        |
+| Meta-heurística  | GRASP              | `metaheuristics/grasp.py`     |
+| Meta-heurística  | Algoritmo Genético | `metaheuristics/ga.py`        |
 
 ---
 
@@ -55,8 +60,13 @@ knapsack-01/
 ├── exact/
 │   ├── instance.py          ← dataclasses: Item, KnapsackInstance, KnapsackSolution
 │   ├── model_pyomo.py       ← Pyomo + HiGHS (solver padrão open-source)
-│   ├── model_jump.jl        ← JuMP + HiGHS  (Julia)
-│   └── model_gurobi.py      ← gurobipy      (requer licença Gurobi)
+│   ├── model_gurobi.py      ← gurobipy      (requer licença Gurobi)
+│   ├── model_ortools.py     ← OR-Tools CP-SAT
+│   └── model_jump.jl        ← JuMP + HiGHS  (Julia)
+├── metaheuristics/
+│   ├── sa.py                ← Simulated Annealing (bit-flip + reparo guloso)
+│   ├── grasp.py             ← GRASP (RCL por razão lucro/peso + busca local)
+│   └── ga.py                ← Algoritmo Genético (cromossomo binário + elitismo)
 ├── notebooks/
 │   ├── 01_formulacao.ipynb
 │   └── 02_solucao_e_analise.ipynb
@@ -94,6 +104,14 @@ julia exact/model_jump.jl instances/small_5.json
 ```bash
 pip install gurobipy  # requer licença ativa
 python exact/model_gurobi.py instances/small_5.json
+```
+
+### Meta-heurísticas
+
+```bash
+python metaheuristics/sa.py instances/small_5.json
+python metaheuristics/grasp.py instances/small_5.json
+python metaheuristics/ga.py instances/small_5.json
 ```
 
 ---

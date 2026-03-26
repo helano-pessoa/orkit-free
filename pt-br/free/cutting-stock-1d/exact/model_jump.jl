@@ -1,279 +1,98 @@
+﻿"""
+Corte de Estoque 1D -- Formulacao MIP Compacta com JuMP + HiGHS
+
+Formulacao:
+    min   sum_n  y_n
+    s.a.  sum_n  x[i,n]  >= d[i]           para todo i  (demanda)
+          sum_i  w[i] * x[i,n]  <= W*y[n]  para todo n  (capacidade)
+          y[n] binario,  x[i,n] inteiro >= 0
+
+N_max = sum(d[i]): cota superior trivial.
+
+Dependencias:
+    ] add JuMP HiGHS JSON3
+
+Referencias:
+    Kantorovich (1960). Mathematical Methods of Organising and Planning Production.
+    Wascher et al. (2007). EJOR, 183(3), 1109-1130.
 """
-    Corte de Estoque 1D — Modelo JuMP com Geração de Colunas
 
-Algoritmo (Gilmore & Gomory, 1961):
-    1. Iniciar com padrões triviais.
-    2. Resolver Mestre LP relaxado → obter preços-sombra π.
-    3. Resolver Sub-problema (Mochila Inteira) com lucros π.
-    4. Se z* > 1 + ε, adicionar nova coluna e repetir.
-    5. Resolver Mestre Inteiro (MIP) com todas as colunas.
-
-Solvers suportados (alterar `optimizer` nas chamadas abaixo):
-    HiGHS  — padrão (open-source, recomendado)
-    GLPK   — alternativo didático
-    Gurobi — opcional (requer licença)
-
-Dependências:
-    Pkg.add(["JuMP", "HiGHS", "JSON3"])
-"""
-module CorteEstoque1D
-
-using JuMP
-using HiGHS
-using JSON3
-
-const EPSILON = 1.0e-6
+using JuMP, HiGHS, JSON3
 
 # ---------------------------------------------------------------------------
 # Estruturas de dados
 # ---------------------------------------------------------------------------
 
-"""
-    TipoPeca
-
-Representa um tipo de peça a ser cortada do rolo-mestre.
-
-# Campos
-- `id::Int`: Identificador único do tipo.
-- `largura::Float64`: Largura da peça.
-- `demanda::Int`: Quantidade demandada.
-"""
 struct TipoPeca
     id::Int
     largura::Float64
     demanda::Int
 end
 
-"""
-    Instancia
-
-Dados completos da instância do Problema de Corte de Estoque 1D.
-
-# Campos
-- `nome::String`: Nome descritivo da instância.
-- `rolo_mestre::Float64`: Largura do rolo-mestre.
-- `pecas::Vector{TipoPeca}`: Tipos de peças demandadas.
-"""
-struct Instancia
+struct InstanciaCS
     nome::String
     rolo_mestre::Float64
     pecas::Vector{TipoPeca}
 end
 
-"""
-    Solucao
-
-Resultado da resolução do Problema de Corte de Estoque 1D.
-
-# Campos
-- `n_rolos::Float64`: Número de rolos-mestre cortados.
-- `padroes::Matrix{Float64}`: Matriz de padrões (m × K).
-- `quantidades::Vector{Float64}`: Uso de cada padrão.
-- `status::String`: Status de terminação do solver.
-"""
-struct Solucao
-    n_rolos::Float64
-    padroes::Matrix{Float64}
-    quantidades::Vector{Float64}
-    status::String
-end
-
-# ---------------------------------------------------------------------------
-# Carregamento de instância
-# ---------------------------------------------------------------------------
-
-"""
-    carregar_instancia(caminho::String) -> Instancia
-
-Carrega uma instância a partir de um arquivo JSON.
-
-# Exemplo
-```julia
-inst = carregar_instancia("instances/small_3.json")
-```
-"""
-function carregar_instancia(caminho::String)::Instancia
+function carregar_instancia(caminho::String)::InstanciaCS
     dados = JSON3.read(read(caminho, String))
     pecas = [TipoPeca(p.id, p.width, p.demand) for p in dados.items]
-    return Instancia(dados.name, dados.master_roll, pecas)
+    InstanciaCS(dados.name, dados.master_roll, pecas)
 end
 
 # ---------------------------------------------------------------------------
-# Problema Mestre LP relaxado
+# Modelo e resolucao
 # ---------------------------------------------------------------------------
 
-"""
-    _resolver_mestre_lp(padroes, demandas, W; optimizer) -> (x, pi)
-
-Resolve o Problema Mestre LP relaxado e retorna os preços-sombra.
-"""
-function _resolver_mestre_lp(
-    padroes::Matrix{Float64},
-    demandas::Vector{Int},
-    W::Float64;
-    optimizer=HiGHS.Optimizer,
-)
-    m, n_cols = size(padroes)
-    mdl = Model(optimizer)
-    set_silent(mdl)
-
-    @variable(mdl, x[1:n_cols] >= 0)
-    @objective(mdl, Min, sum(x))
-    @constraint(mdl, dem[i=1:m], sum(padroes[i, j] * x[j] for j in 1:n_cols) >= demandas[i])
-
-    optimize!(mdl)
-
-    x_vals = value.(x)
-    pi_vals = dual.(dem)  # preços-sombra
-
-    return x_vals, pi_vals
-end
-
-# ---------------------------------------------------------------------------
-# Sub-problema: Mochila Inteira
-# ---------------------------------------------------------------------------
-
-"""
-    _resolver_subproblema(larguras, pi, W; optimizer) -> (z_star, novo_padrao)
-
-Resolve o Sub-problema (Mochila Inteira) com os preços-sombra como lucros.
-"""
-function _resolver_subproblema(
-    larguras::Vector{Float64},
-    pi_vals::Vector{Float64},
-    W::Float64;
-    optimizer=HiGHS.Optimizer,
-)
-    m = length(larguras)
-    mdl = Model(optimizer)
-    set_silent(mdl)
-
-    @variable(mdl, y[1:m] >= 0, Int)
-    @objective(mdl, Max, sum(pi_vals[i] * y[i] for i in 1:m))
-    @constraint(mdl, sum(larguras[i] * y[i] for i in 1:m) <= W)
-
-    optimize!(mdl)
-
-    z_star = objective_value(mdl)
-    novo_padrao = value.(y)
-
-    return z_star, novo_padrao
-end
-
-# ---------------------------------------------------------------------------
-# Resolução principal
-# ---------------------------------------------------------------------------
-
-"""
-    resolver(inst::Instancia; optimizer=HiGHS.Optimizer, verbose::Bool=false) -> Solucao
-
-Resolve o Problema de Corte de Estoque 1D via Geração de Colunas.
-
-# Argumentos
-- `inst`: Instância a ser resolvida.
-- `optimizer`: Otimizador JuMP. Padrão: `HiGHS.Optimizer`.
-- `verbose`: Se `true`, exibe progresso no terminal.
-
-# Retorna
-Objeto `Solucao` com a quantidade de rolos e os padrões de corte.
-
-# Exemplo
-```julia
-inst = carregar_instancia("instances/small_3.json")
-sol  = resolver(inst)
-println("Rolos cortados: \$(sol.n_rolos)")
-```
-"""
-function resolver(
-    inst::Instancia;
-    optimizer=HiGHS.Optimizer,
-    verbose::Bool=false,
-)::Solucao
-    m = length(inst.pecas)
-    larguras = [p.largura for p in inst.pecas]
-    demandas = [p.demanda for p in inst.pecas]
+function resolver(inst::InstanciaCS; verbose::Bool = false)
     W = inst.rolo_mestre
+    pecas = inst.pecas
+    m = length(pecas)
+    ids = [p.id for p in pecas]
+    w = Dict(p.id => p.largura for p in pecas)
+    d = Dict(p.id => p.demanda for p in pecas)
+    n_max = sum(p.demanda for p in pecas)  # cota superior
 
-    # Padrões iniciais triviais (diagonal)
-    max_por_tipo = [Int(floor(W / l)) for l in larguras]
-    padroes = Float64.(Diagonal(max_por_tipo))
+    model = Model(HiGHS.Optimizer)
+    !verbose && set_silent(model)
 
-    iter = 0
-    # --- Geração de Colunas ---
-    while true
-        iter += 1
-        _, pi = _resolver_mestre_lp(padroes, demandas, W; optimizer=optimizer)
-        z_star, novo = _resolver_subproblema(larguras, pi, W; optimizer=optimizer)
+    # Variaveis
+    @variable(model, y[1:n_max], Bin)                         # rolo n aberto?
+    @variable(model, x[ids, 1:n_max] >= 0, Int)               # pecas por rolo
 
-        verbose && println("  [CG iter $iter] z* = $(round(z_star; digits=4))  |  colunas = $(size(padroes, 2))")
+    # Objetivo: minimizar rolos usados
+    @objective(model, Min, sum(y))
 
-        if z_star <= 1.0 + EPSILON
-            break
-        end
-        padroes = hcat(padroes, novo)
+    # Restricoes de demanda
+    for i in ids
+        @constraint(model, sum(x[i, n] for n = 1:n_max) >= d[i])
     end
 
-    verbose && println("[CG] Convergido com $(size(padroes, 2)) padrões. Resolvendo MIP...")
+    # Restricoes de capacidade
+    for n = 1:n_max
+        @constraint(model, sum(w[i] * x[i, n] for i in ids) <= W * y[n])
+    end
 
-    # --- MIP final ---
-    n_cols = size(padroes, 2)
-    mdl_mip = Model(optimizer)
-    set_silent(mdl_mip)
-    verbose && unset_silent(mdl_mip)
+    optimize!(model)
 
-    @variable(mdl_mip, x[1:n_cols] >= 0, Int)
-    @objective(mdl_mip, Min, sum(x))
-    @constraint(mdl_mip, dem[i=1:m], sum(padroes[i, j] * x[j] for j in 1:n_cols) >= demandas[i])
+    status = termination_status(model)
+    rolos = Int(round(objective_value(model)))
 
-    optimize!(mdl_mip)
-
-    status = string(termination_status(mdl_mip))
-    n_rolos = objective_value(mdl_mip)
-    qtds = value.(x)
-
-    return Solucao(n_rolos, padroes, qtds, status)
-end
-
-# ---------------------------------------------------------------------------
-# Impressão de resultados
-# ---------------------------------------------------------------------------
-
-"""
-    imprimir_solucao(inst::Instancia, sol::Solucao)
-
-Exibe os padrões de corte e o total de rolos cortados.
-"""
-function imprimir_solucao(inst::Instancia, sol::Solucao)
-    m, n_cols = size(sol.padroes)
-    println("\nInstância    : $(inst.nome)")
-    println("Rolo-mestre  : $(inst.rolo_mestre)")
-    println("Tipos de peça: $(length(inst.pecas))")
-    println("-" ^ 45)
-    println("Status       : $(sol.status)")
-    println("Padrões ger. : $n_cols")
-    println("Rolos cortad.: $(Int(round(sol.n_rolos)))")
-    println("\nUso dos padrões:")
-    for j in 1:n_cols
-        qty = sol.quantidades[j]
-        if qty > 0.5
-            padrao = [Int(round(sol.padroes[i, j])) for i in 1:m]
-            println("  Padrão $(lpad(j, 2)): $(padrao) × $(Int(round(qty)))")
+    println("Status : $status")
+    println("Rolos  : $rolos")
+    for n = 1:n_max
+        if value(y[n]) > 0.5
+            pat = Dict(i => Int(round(value(x[i, n]))) for i in ids if value(x[i, n]) > 0.5)
+            !isempty(pat) && println("  Rolo $n: $pat")
         end
     end
 end
 
-end  # module CorteEstoque1D
-
-
 # ---------------------------------------------------------------------------
-# Execução direta: julia model_jump.jl [instancia.json]
+# Execucao
 # ---------------------------------------------------------------------------
-using LinearAlgebra  # para Diagonal
 
-if abspath(PROGRAM_FILE) == @__FILE__
-    using .CorteEstoque1D
-    caminho = length(ARGS) > 0 ? ARGS[1] : "instances/small_3.json"
-    inst = CorteEstoque1D.carregar_instancia(caminho)
-    sol  = CorteEstoque1D.resolver(inst; verbose=true)
-    CorteEstoque1D.imprimir_solucao(inst, sol)
-end
+caminho = length(ARGS) >= 1 ? ARGS[1] : "../instances/small_3.json"
+inst = carregar_instancia(caminho)
+resolver(inst)

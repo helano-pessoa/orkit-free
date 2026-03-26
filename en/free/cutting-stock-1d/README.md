@@ -1,22 +1,13 @@
 # 1D Cutting Stock Problem
 
-> Bundle: **FREE** · Type: Linear Programming + Column Generation
+> Bundle: **FREE** · Type: Mixed Integer Programming
 
 ---
 
 ## Description
 
-Given a set of rolls/bars of width $W$ (master roll), and demands
-$d_i$ for pieces of width $w_i$, the goal is to meet all demands
-**minimizing the number of master rolls cut**.
-
-This is a classic problem in the paper, steel, and glass industries.
-The **Column Generation** approach (Gilmore & Gomory, 1961) decomposes the model into:
-
-- **Master Problem** (LP relaxation): selects how many times each cutting
-  pattern is used.
-- **Subproblem** (Integer Knapsack): identifies the most promising column
-  (pattern with most negative reduced cost).
+Given $m$ item types with width $w_i$ and demand $d_i$, and master rolls of width $W$,
+the goal is to meet all demands **minimizing the number of master rolls used**.
 
 ---
 
@@ -24,30 +15,40 @@ The **Column Generation** approach (Gilmore & Gomory, 1961) decomposes the model
 
 **Sets and Parameters**
 - $I = \{1, \ldots, m\}$: item types
+- $N = \{1, \ldots, N_{\max}\}$: available rolls (upper bound)
 - $w_i$: width of item type $i$
 - $d_i$: demand for item type $i$
 - $W$: master roll width
-- $\mathcal{P}$: set of feasible cutting patterns
-- $a_{ij}$: number of items of type $i$ in pattern $j$
 
-**Master Problem — LP relaxation**
+**Decision Variables**
+- $y_n \in \{0, 1\}$: 1 if roll $n$ is opened
+- $x_{in} \in \mathbb{Z}_{\geq 0}$: number of items of type $i$ cut from roll $n$
 
-$$\min \quad \sum_{j \in \mathcal{P}} x_j$$
+**Model**
 
-$$\text{s.a.} \quad \sum_{j \in \mathcal{P}} a_{ij} \, x_j \geq d_i, \quad \forall i \in I$$
+$$\min \quad \sum_{n \in N} y_n$$
 
-$$x_j \geq 0, \quad \forall j \in \mathcal{P}$$
+$$\text{s.t.} \quad \sum_{n \in N} x_{in} \geq d_i, \quad \forall i \in I \quad \text{(demand)}$$
 
-**Subproblem — Integer Knapsack (optimality check)**
+$$\sum_{i \in I} w_i \, x_{in} \leq W \, y_n, \quad \forall n \in N \quad \text{(capacity)}$$
 
-$$z^* = \max \quad \sum_{i \in I} \pi_i y_i$$
+$$y_n \in \{0, 1\}, \quad x_{in} \in \mathbb{Z}_{\geq 0}$$
 
-$$\text{s.a.} \quad \sum_{i \in I} w_i \, y_i \leq W$$
+> Upper bound: $N_{\max} = \sum_{i} d_i$ (worst case — one item per roll).
 
-$$y_i \geq 0, \quad y_i \in \mathbb{Z}, \quad \forall i \in I$$
+---
 
-> A new column is added to the Master if $z^* > 1$.
-> After convergence, the Integer Master (MIP) is solved with all generated columns.
+## Solving Methods
+
+| File | Language | Approach |
+|------|----------|----------|
+| `exact/model_pyomo.py` | Python | Pyomo + HiGHS |
+| `exact/model_gurobi.py` | Python | gurobipy + Gurobi |
+| `exact/model_ortools.py` | Python | OR-Tools (CP-SAT) |
+| `exact/model_jump.jl` | Julia | JuMP + HiGHS |
+| `metaheuristics/sa.py` | Python | Simulated Annealing |
+| `metaheuristics/grasp.py` | Python | GRASP |
+| `metaheuristics/ga.py` | Python | Genetic Algorithm |
 
 ---
 
@@ -57,16 +58,18 @@ $$y_i \geq 0, \quad y_i \in \mathbb{Z}, \quad \forall i \in I$$
 cutting-stock-1d/
 ├── README.md
 ├── exact/
-│   ├── instance.py              ← dataclasses: CuttingStockInstance, Solution
-│   ├── model_pyomo.py           ← Column Generation with Pyomo + HiGHS
-│   ├── model_jump.jl            ← Column Generation with JuMP + HiGHS
-│   └── model_gurobi.py          ← gurobipy (optional — requires license)
-├── notebooks/
-│   ├── 01_formulation.ipynb
-│   └── 02_column_generation.ipynb
+│   ├── instance.py              ← dataclasses: ItemType, CuttingStockInstance
+│   ├── model_pyomo.py           ← Pyomo + HiGHS
+│   ├── model_gurobi.py          ← gurobipy  (requires license)
+│   ├── model_ortools.py         ← OR-Tools CP-SAT
+│   └── model_jump.jl            ← JuMP + HiGHS
+├── metaheuristics/
+│   ├── sa.py                    ← Simulated Annealing
+│   ├── grasp.py                 ← GRASP
+│   └── ga.py                   ← Genetic Algorithm
 ├── instances/
-│   ├── small_3.json             ← 3 item types
-│   └── medium_7.json            ← 7 item types
+│   ├── small_3.json
+│   └── medium_7.json
 └── results/
     └── benchmark.md
 ```
@@ -78,22 +81,24 @@ cutting-stock-1d/
 ### Python (Pyomo + HiGHS)
 
 ```bash
-pip install pyomo highspy numpy
-python exact/model_pyomo.py instances/small_3.json
+pip install pyomo highspy
+cd exact/
+python model_pyomo.py ../instances/small_3.json
 ```
 
 ### Julia (JuMP + HiGHS)
 
-```bash
-julia -e 'using Pkg; Pkg.add(["JuMP", "HiGHS", "JSON3"])'
+```julia
+# ] add JuMP HiGHS JSON3
 julia exact/model_jump.jl instances/small_3.json
 ```
 
-### Gurobi (optional)
+### Metaheuristics
 
 ```bash
-pip install gurobipy
-python exact/model_gurobi.py instances/small_3.json
+python metaheuristics/sa.py instances/small_3.json
+python metaheuristics/grasp.py instances/small_3.json
+python metaheuristics/ga.py instances/small_3.json
 ```
 
 ---
@@ -102,12 +107,12 @@ python exact/model_gurobi.py instances/small_3.json
 
 ```json
 {
-  "name": "cutting_stock_small_3",
+  "name": "cutting_small_3",
   "master_roll": 100,
   "items": [
-    {"id": 1, "width": 25, "demand": 4},
-    {"id": 2, "width": 40, "demand": 3},
-    {"id": 3, "width": 15, "demand": 6}
+    {"id": 1, "width": 45, "demand": 4},
+    {"id": 2, "width": 35, "demand": 3},
+    {"id": 3, "width": 20, "demand": 6}
   ]
 }
 ```
@@ -116,8 +121,6 @@ python exact/model_gurobi.py instances/small_3.json
 
 ## References
 
-- Gilmore, P. C., Gomory, R. E. (1961). A linear programming approach to
-  the cutting stock problem. *Operations Research*, 9(6), 849–859.
-- Gilmore, P. C., Gomory, R. E. (1963). A linear programming approach to
-  the cutting stock problem — Part II. *Operations Research*, 11(6), 863–888.
-- Uchoa, E., Pessoa, A., Moreno, M. (2024). *Column Generation*. Springer.
+- Kantorovich, L. V. (1960). Mathematical Methods of Organising and Planning Production.
+- Wäscher, G., Haußner, H., Schumann, H. (2007). An improved typology of cutting
+  and packing problems. *European Journal of Operational Research*, 183(3), 1109–1130.

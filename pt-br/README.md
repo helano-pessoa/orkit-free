@@ -1,12 +1,17 @@
-# ORKit Free (PT-BR)
-> Amostras gratuitas publicas do ORKit
+# ORKit Free — PT-BR
+> Templates de Pesquisa Operacional em Python e Julia — amostras gratuitas
 
-Amostras disponiveis em [free/](free/):
+Problemas disponíveis em [free/](free/):
 
-- Mochila 0/1
-- Corte de Estoque 1D
-- Transporte Classico
+| Problema | Tipo |
+|---|---|
+| [Mochila 0/1](free/knapsack-01/) | Programação Inteira Binária |
+| [Corte de Estoque 1D](free/cutting-stock-1d/) | Programação Inteira Mista |
+| [Transporte](free/transportation/) | Programação Linear |
 
-## Versao completa
+Cada problema inclui solucionadores exatos (Pyomo+HiGHS, gurobipy, OR-Tools, JuMP+HiGHS)
+e meta-heurísticas (Simulated Annealing, GRASP, Algoritmo Genético).
 
-O repositorio completo (privado) contem os bundles BASIC, PRO e MASTER.
+---
+
+*Desenvolvido por Helano Pessoa*

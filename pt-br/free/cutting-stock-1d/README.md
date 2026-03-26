@@ -1,22 +1,14 @@
 # Corte de Estoque 1D (1D Cutting Stock Problem)
 
-> Bundle: **Gratuito (free)** · Tipo: Programação Linear + Geração de Colunas
+> Bundle: **Gratuito (free)** · Tipo: Programação Inteira Mista
 
 ---
 
 ## Descrição
 
-Dado um conjunto de bobinas/barras de tamanho $W$ (rolo-mestre), e demandas
-$d_i$ por peças de tamanho $w_i$, o objetivo é atender toda a demanda
-**minimizando o número de rolos-mestre cortados**.
-
-Este problema é clássico na indústria de papel, aço e vidro. A abordagem
-via **Geração de Colunas** (Gilmore & Gomory, 1961) decompõe o modelo em:
-
-- **Problema Mestre** (LP relaxado): seleciona quantas vezes cada padrão de
-  corte é usado
-- **Sub-problema** (Mochila Inteira): identifica o padrão de maior custo
-  reduzido (coluna promissora)
+Dado um conjunto de $m$ tipos de peça com largura $w_i$ e demanda $d_i$, e
+rolos-mestre de largura $W$, o objetivo é atender toda a demanda
+**minimizando o número de rolos-mestre utilizados**.
 
 ---
 
@@ -24,82 +16,104 @@ via **Geração de Colunas** (Gilmore & Gomory, 1961) decompõe o modelo em:
 
 **Conjuntos e Parâmetros**
 - $I = \{1, \ldots, m\}$: tipos de peça
+- $N = \{1, \ldots, N_{\max}\}$: rolos disponíveis (cota superior)
 - $w_i$: largura da peça do tipo $i$
-- $d_i$: demanda pela peça do tipo $i$
+- $d_i$: demanda da peça do tipo $i$
 - $W$: largura do rolo-mestre
-- $\mathcal{P}$: conjunto de padrões de corte viáveis
-- $a_{ij}$: número de peças do tipo $i$ no padrão $j$
 
-**Problema Mestre — LP relaxado**
+**Variáveis de decisão**
+- $y_n \in \{0, 1\}$: 1 se o rolo $n$ for aberto
+- $x_{in} \in \mathbb{Z}_{\geq 0}$: quantidade de peças do tipo $i$ cortadas do rolo $n$
 
-$$\min \quad \sum_{j \in \mathcal{P}} x_j$$
+**Modelo**
 
-$$\text{s.a.} \quad \sum_{j \in \mathcal{P}} a_{ij} \, x_j \geq d_i, \quad \forall i \in I$$
+$$\min \quad \sum_{n \in N} y_n$$
 
-$$x_j \geq 0, \quad \forall j \in \mathcal{P}$$
+$$\text{s.a.} \quad \sum_{n \in N} x_{in} \geq d_i, \quad \forall i \in I \quad \text{(demanda)}$$
 
-**Sub-problema — Mochila Inteira (teste de otimalidade)**
+$$\sum_{i \in I} w_i \, x_{in} \leq W \, y_n, \quad \forall n \in N \quad \text{(capacidade)}$$
 
-$$z^* = \max \quad \sum_{i \in I} \pi_i y_i$$
+$$y_n \in \{0, 1\}, \quad x_{in} \in \mathbb{Z}_{\geq 0}$$
 
-$$\text{s.a.} \quad \sum_{i \in I} w_i \, y_i \leq W$$
-
-$$y_i \geq 0, \quad y_i \in \mathbb{Z}, \quad \forall i \in I$$
-
-> Nova coluna é adicionada ao Mestre se $z^* > 1$.
-> Após convergência, resolve-se o Mestre inteiro (MIP) com todas as colunas geradas.
+> Cota superior: $N_{\max} = \sum_{i} d_i$ (pior caso — cada peça em rolo separado).
 
 ---
 
-## Estrutura de arquivos
+## Métodos de Resolução
+
+| Arquivo | Linguagem | Abordagem |
+|---------|-----------|-----------|
+| `exact/model_pyomo.py` | Python | Pyomo + HiGHS |
+| `exact/model_gurobi.py` | Python | gurobipy + Gurobi |
+| `exact/model_ortools.py` | Python | OR-Tools (CP-SAT) |
+| `exact/model_jump.jl` | Julia | JuMP + HiGHS |
+| `metaheuristics/sa.py` | Python | Simulated Annealing |
+| `metaheuristics/grasp.py` | Python | GRASP |
+| `metaheuristics/ga.py` | Python | Algoritmo Genético |
+
+---
+
+## Estrutura de Arquivos
 
 ```
 cutting-stock-1d/
 ├── README.md
 ├── exact/
-│   ├── instance.py              ← dataclasses: CuttingStockInstance, Solution
-│   ├── model_pyomo.py           ← Geração de Colunas com Pyomo + HiGHS
-│   └── model_gurobi.py          ← gurobipy (opcional — requer licença)
-├── notebooks/
-│   ├── 01_formulacao.ipynb
-│   └── 02_geracao_de_colunas.ipynb
+│   ├── instance.py              ← dataclasses: ItemType, CuttingStockInstance
+│   ├── model_pyomo.py           ← Pyomo + HiGHS
+│   ├── model_gurobi.py          ← gurobipy  (requer licença)
+│   ├── model_ortools.py         ← OR-Tools CP-SAT
+│   └── model_jump.jl            ← JuMP + HiGHS
+├── metaheuristics/
+│   ├── sa.py                    ← Simulated Annealing
+│   ├── grasp.py                 ← GRASP
+│   └── ga.py                   ← Algoritmo Genético
 ├── instances/
-│   ├── small_3.json             ← 3 tipos de peça
-│   └── medium_7.json            ← 7 tipos de peça
+│   ├── small_3.json
+│   └── medium_7.json
 └── results/
     └── benchmark.md
 ```
 
 ---
 
-## Como executar
+## Como Executar
 
 ### Python (Pyomo + HiGHS)
 
 ```bash
-pip install pyomo highspy numpy
-python exact/model_pyomo.py instances/small_3.json
+pip install pyomo highspy
+cd exact/
+python model_pyomo.py ../instances/small_3.json
 ```
 
-### Gurobi (opcional)
+### Julia (JuMP + HiGHS)
+
+```julia
+# ] add JuMP HiGHS JSON3
+julia exact/model_jump.jl instances/small_3.json
+```
+
+### Metaheurísticas
 
 ```bash
-pip install gurobipy
-python exact/model_gurobi.py instances/small_3.json
+python metaheuristics/sa.py instances/small_3.json
+python metaheuristics/grasp.py instances/small_3.json
+python metaheuristics/ga.py instances/small_3.json
 ```
 
 ---
 
-## Formato de instância (JSON)
+## Formato de Instância (JSON)
 
 ```json
 {
-  "name": "cutting_stock_small_3",
+  "name": "cutting_small_3",
   "master_roll": 100,
   "items": [
-    {"id": 1, "width": 25, "demand": 4},
-    {"id": 2, "width": 40, "demand": 3},
-    {"id": 3, "width": 15, "demand": 6}
+    {"id": 1, "width": 45, "demand": 4},
+    {"id": 2, "width": 35, "demand": 3},
+    {"id": 3, "width": 20, "demand": 6}
   ]
 }
 ```
@@ -108,8 +122,6 @@ python exact/model_gurobi.py instances/small_3.json
 
 ## Referências
 
-- Gilmore, P. C., Gomory, R. E. (1961). A linear programming approach to
-  the cutting stock problem. *Operations Research*, 9(6), 849–859.
-- Gilmore, P. C., Gomory, R. E. (1963). A linear programming approach to
-  the cutting stock problem — Part II. *Operations Research*, 11(6), 863–888.
-- Uchoa, E., Pessoa, A., Moreno, M. (2024). *Column Generation*. Springer.
+- Kantorovich, L. V. (1960). Mathematical Methods of Organising and Planning Production.
+- Wäscher, G., Haußner, H., Schumann, H. (2007). An improved typology of cutting
+  and packing problems. *European Journal of Operational Research*, 183(3), 1109–1130.

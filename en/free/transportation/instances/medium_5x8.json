@@ -1,0 +1,29 @@
+﻿{
+  "name": "transport_medium_5x8",
+  "description": "Medium balanced instance: 5 suppliers, 8 customers",
+  "suppliers": [
+    {"id": 1, "supply": 100},
+    {"id": 2, "supply": 200},
+    {"id": 3, "supply": 150},
+    {"id": 4, "supply": 120},
+    {"id": 5, "supply": 130}
+  ],
+  "customers": [
+    {"id": 1, "demand": 80},
+    {"id": 2, "demand": 90},
+    {"id": 3, "demand": 100},
+    {"id": 4, "demand": 110},
+    {"id": 5, "demand": 80},
+    {"id": 6, "demand": 60},
+    {"id": 7, "demand": 90},
+    {"id": 8, "demand": 90}
+  ],
+  "costs": [
+    [4, 8, 1, 6, 3, 7, 2, 5],
+    [7, 2, 3, 5, 8, 4, 6, 1],
+    [1, 5, 7, 4, 2, 9, 3, 6],
+    [6, 3, 5, 1, 7, 2, 8, 4],
+    [3, 6, 4, 8, 5, 1, 7, 2]
+  ],
+  "source": "ORKit v1.0"
+}

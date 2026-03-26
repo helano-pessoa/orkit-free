@@ -1,12 +1,17 @@
-# ORKit Free (EN)
-> Public free samples from ORKit
+# ORKit Free — EN
+> Operations Research model templates in Python and Julia — free samples
 
-Samples available in [free/](free/):
+Problems available in [free/](free/):
 
-- 0/1 Knapsack
-- 1D Cutting Stock
-- Transportation
+| Problem | Type |
+|---|---|
+| [0/1 Knapsack](free/knapsack-01/) | Binary Integer Programming |
+| [1D Cutting Stock](free/cutting-stock-1d/) | Mixed Integer Programming |
+| [Transportation](free/transportation/) | Linear Programming |
 
-## Full version
+Each problem includes exact solvers (Pyomo+HiGHS, gurobipy, OR-Tools, JuMP+HiGHS)
+and metaheuristics (Simulated Annealing, GRASP, Genetic Algorithm).
 
-The complete private repository contains BASIC, PRO and MASTER bundles.
+---
+
+*Developed by Helano Pessoa*

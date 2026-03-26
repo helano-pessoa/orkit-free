@@ -1,6 +1,6 @@
 # Problema de Transporte (Transportation Problem)
 
-> Bundle: **Gratuito (free)** · Tipo: Programação Linear Clássica
+> Tipo: Programação Linear Clássica
 
 ---
 
@@ -38,29 +38,71 @@ $$x_{ij} \geq 0, \quad \forall i \in I, j \in J$$
 
 ---
 
+## Métodos de resolução
+
+| Categoria        | Ferramenta         | Arquivo                       |
+|------------------|--------------------|-------------------------------|
+| Exato            | Pyomo + HiGHS      | `exact/model_pyomo.py`        |
+| Exato            | Gurobi             | `exact/model_gurobi.py`       |
+| Exato            | OR-Tools GLOP      | `exact/model_ortools.py`      |
+| Exato            | JuMP + HiGHS       | `exact/model_jump.jl`         |
+| Meta-heurística  | Simulated Annealing| `metaheuristics/sa.py`        |
+| Meta-heurística  | GRASP              | `metaheuristics/grasp.py`     |
+| Meta-heurística  | Algoritmo Genético | `metaheuristics/ga.py`        |
+
+---
+
 ## Estrutura de Arquivos
 
 ```
 transportation/
 ├── README.md
 ├── exact/
-│   ├── instance.py
-│   ├── model_pyomo.py
-│   ├── model_jump.jl
-│   └── model_gurobi.py
+│   ├── instance.py          ← dataclasses: Fornecedor, Cliente, InstanciaTransporte
+│   ├── model_pyomo.py       ← Pyomo + HiGHS (solver padrão open-source)
+│   ├── model_gurobi.py      ← gurobipy      (requer licença Gurobi)
+│   ├── model_ortools.py     ← OR-Tools GLOP (LP contínuo)
+│   └── model_jump.jl        ← JuMP + HiGHS  (Julia)
+├── metaheuristics/
+│   ├── sa.py                ← Simulated Annealing (init NW + perturbação em quadrado)
+│   ├── grasp.py             ← GRASP (RCL custo mínimo + realocação de fluxo)
+│   └── ga.py                ← Algoritmo Genético (cromossomo plano + reparo Sinkhorn)
 ├── notebooks/
 ├── instances/
-│   ├── small_3x4.json
-│   └── medium_5x8.json
+│   ├── small_3x4.json       ← 3 fornecedores, 4 clientes (ótimo = 520)
+│   └── medium_5x8.json      ← 5 fornecedores, 8 clientes
 └── results/
     └── benchmark.md
 ```
 
 ---
 
-## Status
+## Como executar
 
-🚧 **Em desenvolvimento** — disponível em breve no pacote Gratuito.
+### Python (Pyomo + HiGHS)
+
+```bash
+pip install pyomo highspy
+cd exact/
+python model_pyomo.py ../instances/small_3x4.json
+```
+
+### Julia (JuMP + HiGHS)
+
+```julia
+# Instalar dependências (uma vez):
+# ] add JuMP HiGHS JSON3
+
+julia exact/model_jump.jl instances/small_3x4.json
+```
+
+### Meta-heurísticas
+
+```bash
+python metaheuristics/sa.py instances/small_3x4.json
+python metaheuristics/grasp.py instances/small_3x4.json
+python metaheuristics/ga.py instances/small_3x4.json
+```
 
 ---
 

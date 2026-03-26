@@ -1,6 +1,6 @@
 # Transportation Problem
 
-> Bundle: **FREE** · Type: Classical Linear Programming
+> Type: Classical Linear Programming
 
 ---
 
@@ -38,29 +38,71 @@ $$x_{ij} \geq 0, \quad \forall i \in I, j \in J$$
 
 ---
 
-## File Structure
+## Solving methods
+
+| Category         | Tool               | File                          |
+|------------------|--------------------|-------------------------------|
+| Exact            | Pyomo + HiGHS      | `exact/model_pyomo.py`        |
+| Exact            | Gurobi             | `exact/model_gurobi.py`       |
+| Exact            | OR-Tools GLOP      | `exact/model_ortools.py`      |
+| Exact            | JuMP + HiGHS       | `exact/model_jump.jl`         |
+| Metaheuristic    | Simulated Annealing| `metaheuristics/sa.py`        |
+| Metaheuristic    | GRASP              | `metaheuristics/grasp.py`     |
+| Metaheuristic    | Genetic Algorithm  | `metaheuristics/ga.py`        |
+
+---
+
+## File structure
 
 ```
 transportation/
 ├── README.md
 ├── exact/
-│   ├── instance.py
-│   ├── model_pyomo.py
-│   ├── model_jump.jl
-│   └── model_gurobi.py
+│   ├── instance.py          ← dataclasses: Supplier, Customer, TransportInstance
+│   ├── model_pyomo.py       ← Pyomo + HiGHS (default open-source solver)
+│   ├── model_gurobi.py      ← gurobipy      (requires Gurobi license)
+│   ├── model_ortools.py     ← OR-Tools GLOP (continuous LP)
+│   └── model_jump.jl        ← JuMP + HiGHS  (Julia)
+├── metaheuristics/
+│   ├── sa.py                ← Simulated Annealing (NW init + square-loop perturbation)
+│   ├── grasp.py             ← GRASP (min-cost RCL + flow reallocation)
+│   └── ga.py                ← Genetic Algorithm (flat matrix + Sinkhorn repair)
 ├── notebooks/
 ├── instances/
-│   ├── small_3x4.json
-│   └── medium_5x8.json
+│   ├── small_3x4.json       ← 3 suppliers, 4 customers (optimal = 520)
+│   └── medium_5x8.json      ← 5 suppliers, 8 customers
 └── results/
     └── benchmark.md
 ```
 
 ---
 
-## Status
+## How to run
 
-🚧 **Under development** — coming soon in the FREE bundle.
+### Python (Pyomo + HiGHS)
+
+```bash
+pip install pyomo highspy
+cd exact/
+python model_pyomo.py ../instances/small_3x4.json
+```
+
+### Julia (JuMP + HiGHS)
+
+```julia
+# Install dependencies (once):
+# ] add JuMP HiGHS JSON3
+
+julia exact/model_jump.jl instances/small_3x4.json
+```
+
+### Metaheuristics
+
+```bash
+python metaheuristics/sa.py instances/small_3x4.json
+python metaheuristics/grasp.py instances/small_3x4.json
+python metaheuristics/ga.py instances/small_3x4.json
+```
 
 ---
 

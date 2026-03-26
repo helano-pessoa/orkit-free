@@ -1,0 +1,22 @@
+﻿{
+  "name": "transport_small_3x4",
+  "description": "Small balanced instance: 3 suppliers, 4 customers",
+  "suppliers": [
+    {"id": 1, "supply": 120},
+    {"id": 2, "supply": 80},
+    {"id": 3, "supply": 80}
+  ],
+  "customers": [
+    {"id": 1, "demand": 70},
+    {"id": 2, "demand": 50},
+    {"id": 3, "demand": 60},
+    {"id": 4, "demand": 100}
+  ],
+  "costs": [
+    [2, 3, 1, 5],
+    [7, 3, 4, 6],
+    [8, 5, 2, 1]
+  ],
+  "optimal_value": 520,
+  "source": "ORKit v1.0"
+}
