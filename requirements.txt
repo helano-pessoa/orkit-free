@@ -3,6 +3,7 @@
 
 pyomo>=6.7
 highspy>=1.7
+ortools>=9.7
 numpy>=1.26
 pandas>=2.1
 scipy>=1.12
